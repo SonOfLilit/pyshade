@@ -1,14 +1,14 @@
 import compiler, inspect
 from annotations import types, returns
-from gltypes import vec3, vec4
+from gl import *
 
 VALID_TYPES = 'float vec2 vec3 vec4'.split()
 
-def to_glsl(f):
+def to_glsl(*functions):
     out = []
-    tree = compiler.parse(inspect.getsource(f))
-    functions = tree.node.nodes
-    for func in functions:
+    for f in functions:
+        tree = compiler.parse(inspect.getsource(f))
+        func, = tree.node.nodes
         assert isinstance(func, compiler.ast.Function)
         returnType = f.func_annotation['return'].__name__
         assert returnType in VALID_TYPES
@@ -23,6 +23,12 @@ def code_to_glsl(code):
         if isinstance(statement, compiler.ast.Return):
             return 'return %s;' % expression_to_glsl(statement.value)
 
+BIN_OPS = {
+    compiler.ast.Add: '+',
+    compiler.ast.Sub: '-',
+    compiler.ast.Mul: '*',
+    compiler.ast.Div: '/',
+}
 def expression_to_glsl(expr):
     if isinstance(expr, compiler.ast.Name):
         return expr.name
@@ -30,10 +36,8 @@ def expression_to_glsl(expr):
 def _expression_to_glsl(expr):
     if isinstance(expr, compiler.ast.Const):
         return repr(expr.value)
-    if isinstance(expr, compiler.ast.Add):
-        return binop_to_glsl('+', expr.left, expr.right)
-    if isinstance(expr, compiler.ast.Mul):
-        return binop_to_glsl('*', expr.left, expr.right)
+    if expr.__class__ in BIN_OPS:
+        return binop_to_glsl(BIN_OPS[expr.__class__], expr.left, expr.right)
     if isinstance(expr, compiler.ast.CallFunc):
         args = ', '.join(expression_to_glsl(arg) for arg in expr.args)
         assert expr.star_args is None
@@ -48,5 +52,6 @@ def binop_to_glsl(op, left, right):
 @returns(vec4)
 def render():
     return vec4(1.0, 0.0, 0.0, 1.0) * sin(iGlobalTime) + vec4(0.0, 1.0, 0.0, 1.0) * cos(iGlobalTime)
-
+iGlobalTime = 0.0
+assert render() == vec4(0.0, 1.0, 0.0, 1.0), render()
 print to_glsl(render)
