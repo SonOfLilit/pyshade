@@ -19,9 +19,25 @@ def to_glsl(*functions):
     return '\n'.join(out)
         
 def code_to_glsl(code):
+    out = []
+    variables = set()
     for statement in code.nodes:
-        if isinstance(statement, compiler.ast.Return):
-            return 'return %s;' % expression_to_glsl(statement.value)
+        if isinstance(statement, compiler.ast.Assign):
+            assert len(statement.nodes) == 1
+            ass_name = statement.nodes[0]
+            assert ass_name.flags == 'OP_ASSIGN'
+            name = ass_name.name
+            if name not in variables:
+                variableType = 'vec4'
+                out.insert(0, '%s %s;' % (variableType, name))
+                variables.add(name)
+            out.append('%s = %s;' % (name, expression_to_glsl(statement.expr)))
+        elif isinstance(statement, compiler.ast.Return):
+            out.append('return %s;' % expression_to_glsl(statement.value))
+        else:
+            print statement
+            assert False
+    return '\n'.join(out)
 
 BIN_OPS = {
     compiler.ast.Add: '+',
@@ -51,7 +67,9 @@ def binop_to_glsl(op, left, right):
 
 @returns(vec4)
 def render():
-    return vec4(1.0, 0.0, 0.0, 1.0) * sin(iGlobalTime) + vec4(0.0, 1.0, 0.0, 1.0) * cos(iGlobalTime)
+    a = vec4(1.0, 0.0, 0.0, 1.0)
+    b = vec4(0.0, 1.0, 0.0, 1.0)
+    return a * sin(iGlobalTime) + b * cos(iGlobalTime)
 iGlobalTime = 0.0
 assert render() == vec4(0.0, 1.0, 0.0, 1.0), render()
 print to_glsl(render)
